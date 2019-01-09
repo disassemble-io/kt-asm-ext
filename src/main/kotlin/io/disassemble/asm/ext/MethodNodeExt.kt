@@ -125,4 +125,6 @@ private fun visitTree(insns: Array<AbstractInsnNode>, parent: AbstractInsnNode, 
         parent.children.add(next)
         visitTree(insns, next, idx, childCtr)
     }
+
+    parent.children.reverse()
 }

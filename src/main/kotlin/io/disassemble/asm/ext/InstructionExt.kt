@@ -11,7 +11,7 @@ import org.objectweb.asm.util.Printer
  * @since 6/24/2018
  */
 
-private val CHILD_MAP: MutableMap<Int, MutableSet<AbstractInsnNode>> = HashMap()
+private val CHILD_MAP: MutableMap<Int, MutableList<AbstractInsnNode>> = HashMap()
 
 /**
  * Provides a unique hash for this instruction
@@ -24,12 +24,12 @@ val AbstractInsnNode.hash: Int
 /**
  * The children involved with the instruction tree of this instruction
  */
-val AbstractInsnNode.children: MutableSet<AbstractInsnNode>
+val AbstractInsnNode.children: MutableList<AbstractInsnNode>
     get() {
         return if (hash in CHILD_MAP) {
             CHILD_MAP[hash]!!
         } else {
-            val children = HashSet<AbstractInsnNode>()
+            val children = ArrayList<AbstractInsnNode>()
             CHILD_MAP[hash] = children
             children
         }
