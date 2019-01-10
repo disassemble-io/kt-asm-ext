@@ -521,4 +521,8 @@ object Queries {
     fun inc(`var`: Int?, incr: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
         it is IincInsnNode && (`var` == null || it.`var` == `var`) && (incr == null || it.incr == incr)
     }, cq)
+
+    fun inc(incr: Int?, cq: ChildQuery? = null): InsnQuery = inc(null, incr, cq)
+
+    fun inc(cq: ChildQuery? = null): InsnQuery = inc(null, cq)
 }
