@@ -7,15 +7,7 @@ import org.objectweb.asm.tree.*
 import org.objectweb.asm.util.Printer
 import java.util.ArrayList
 import kotlin.collections.HashMap
-import kotlin.collections.List
-import kotlin.collections.MutableList
-import kotlin.collections.MutableMap
-import kotlin.collections.contains
-import kotlin.collections.emptyList
-import kotlin.collections.forEach
-import kotlin.collections.indices
 import kotlin.collections.set
-import kotlin.collections.toMutableList
 
 /**
  * @author Tyler Sedlar
@@ -233,7 +225,7 @@ fun AbstractInsnNode.nextValidPattern(vararg opcodes: Int): List<AbstractInsnNod
 fun AbstractInsnNode.nextInTree(query: (AbstractInsnNode) -> Boolean, maxDist: Int = 50): AbstractInsnNode? {
     var next: AbstractInsnNode? = this.nextInTree
     var dist = 1
-    while (next != null &&  dist < maxDist) {
+    while (next != null && dist < maxDist) {
         if (query(next)) {
             return next
         }

@@ -64,7 +64,8 @@ class InsnQuery(var filter: InsnFilter) {
     /**
      * Finds and maps the queries neighboring the given instruction
      */
-    private fun findNexts(insn: AbstractInsnNode, queries: List<InsnQuery>, map: InsnNameMap) {
+    private fun findNexts(insn: AbstractInsnNode, queries: List<InsnQuery>,
+                          map: InsnNameMap = HashMap()): InsnNameMap {
         val nexts: MutableList<AbstractInsnNode> = ArrayList()
         var matchCount = 0
         var last = insn
@@ -80,6 +81,7 @@ class InsnQuery(var filter: InsnFilter) {
                 map(map, nexts[i], queries[i])
             }
         }
+        return map
     }
 
     /**
@@ -100,6 +102,14 @@ class InsnQuery(var filter: InsnFilter) {
                             failedNest = true
                         } else {
                             childMap.putAll(nestedChildren)
+                        }
+                    }
+                    if (query.nearQueries.isNotEmpty()) {
+                        val nestedNears = findNexts(root, query.nearQueries)
+                        if (nestedNears.isEmpty()) {
+                            failedNest = true
+                        } else {
+                            childMap.putAll(nestedNears)
                         }
                     }
                 }
