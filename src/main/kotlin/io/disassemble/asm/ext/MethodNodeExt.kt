@@ -128,14 +128,18 @@ private fun visitTree(insns: Array<AbstractInsnNode>, parent: AbstractInsnNode, 
     var prev: AbstractInsnNode? = null
 
     while (childCtr.get() < expected) {
-        val next = insns[idx.get()]
-        if (prev != null) {
-            next.setNeighborsInTree(prev)
+        try {
+            val next = insns[idx.get()]
+            if (prev != null) {
+                next.setNeighborsInTree(prev)
+            }
+            next.setParent(parent)
+            parent.children.add(next)
+            visitTree(insns, next, idx, childCtr)
+            prev = next
+        } catch (e: ArrayIndexOutOfBoundsException) {
+            break
         }
-        next.setParent(parent)
-        parent.children.add(next)
-        visitTree(insns, next, idx, childCtr)
-        prev = next
     }
 
     parent.children.reverse()
