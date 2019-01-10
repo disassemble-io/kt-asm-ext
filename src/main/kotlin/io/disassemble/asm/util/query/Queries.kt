@@ -5,10 +5,7 @@ import io.disassemble.asm.ext.hash
 import io.disassemble.asm.ext.nextInTree
 import io.disassemble.asm.util.StringMatcher
 import org.objectweb.asm.Opcodes.*
-import org.objectweb.asm.tree.AbstractInsnNode
-import org.objectweb.asm.tree.FieldInsnNode
-import org.objectweb.asm.tree.IntInsnNode
-import org.objectweb.asm.tree.MethodInsnNode
+import org.objectweb.asm.tree.*
 
 typealias InsnFilter = (insn: AbstractInsnNode) -> Boolean
 typealias ChildQuery = () -> InsnQuery
@@ -186,6 +183,18 @@ object Queries {
     val num: InsnQuery = InsnQuery({ it is IntInsnNode })
     val method: InsnQuery = InsnQuery({ it is MethodInsnNode })
     val field: InsnQuery = InsnQuery({ it is FieldInsnNode })
+    val lvar: InsnQuery = InsnQuery({ it is VarInsnNode })
+    val jump: InsnQuery = InsnQuery({ it is JumpInsnNode })
+    var frame: InsnQuery = InsnQuery({ it is FrameNode })
+    var label: InsnQuery = InsnQuery({ it is LabelNode })
+    var constant: InsnQuery = InsnQuery({ it is LdcInsnNode })
+    var line: InsnQuery = InsnQuery({ it is LineNumberNode })
+    var tswitch: InsnQuery = InsnQuery({ it is TableSwitchInsnNode })
+    var lswitch: InsnQuery = InsnQuery({ it is LookupSwitchInsnNode })
+    var mana: InsnQuery = InsnQuery({ it is MultiANewArrayInsnNode })
+    var type: InsnQuery = InsnQuery({ it is TypeInsnNode })
+    var dynamic: InsnQuery = InsnQuery({ it is InvokeDynamicInsnNode })
+    var inc: InsnQuery = InsnQuery({ it is IincInsnNode })
 
     val nop: InsnQuery = op(NOP)
     val aconst_null: InsnQuery = op(ACONST_NULL)
@@ -349,15 +358,167 @@ object Queries {
         it.opcode == opcode
     }, cq)
 
-    fun num(operand: Int, cq: ChildQuery? = null): InsnQuery = InsnQuery({
-        it is IntInsnNode && it.operand == operand
+    fun filter(filter: InsnFilter, cq: ChildQuery? = null) = InsnQuery(filter, cq)
+
+    fun use(query: InsnQuery, cq: ChildQuery?): InsnQuery {
+        val q = InsnQuery(query.filter)
+        q.name = query.name
+        q.dist = query.dist
+        cq?.let { query.childQueries.add(it()) }
+        return q
+    }
+
+    fun num(operand: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is IntInsnNode && (operand == null || it.operand == operand)
     }, cq)
 
-    fun method(desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
-        it is MethodInsnNode && (desc == null || StringMatcher.matches(desc, it.desc))
+    fun num(cq: ChildQuery? = null): InsnQuery = num(null, cq)
+
+    fun method(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is MethodInsnNode && (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
     }, cq)
 
-    fun field(desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
-        it is FieldInsnNode && (desc == null || StringMatcher.matches(desc, it.desc))
+    fun method(desc: String?, cq: ChildQuery? = null): InsnQuery = method(null, desc, cq)
+
+    fun method(cq: ChildQuery? = null): InsnQuery = method(null, cq)
+
+    fun membmethod(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (it.opcode == INVOKEVIRTUAL || it.opcode == INVOKESPECIAL) &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun membmethod(desc: String?, cq: ChildQuery? = null): InsnQuery = membmethod(null, desc, cq)
+
+    fun membmethod(cq: ChildQuery? = null): InsnQuery = membmethod(null, cq)
+
+    fun statmethod(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && it.opcode == INVOKESTATIC &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun statmethod(desc: String?, cq: ChildQuery? = null): InsnQuery = statmethod(null, desc, cq)
+
+    fun statmethod(cq: ChildQuery? = null): InsnQuery = statmethod(null, cq)
+
+    fun field(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun field(desc: String?, cq: ChildQuery? = null): InsnQuery = field(null, desc, cq)
+
+    fun field(cq: ChildQuery? = null): InsnQuery = field(null, cq)
+
+    fun membfield(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (it.opcode == PUTFIELD || it.opcode == GETFIELD) &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun membfield(desc: String?, cq: ChildQuery? = null): InsnQuery = membfield(null, desc, cq)
+
+    fun membfield(cq: ChildQuery? = null): InsnQuery = membfield(null, cq)
+
+    fun statfield(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (it.opcode == PUTSTATIC || it.opcode == GETSTATIC) &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun statfield(desc: String?, cq: ChildQuery? = null): InsnQuery = statfield(null, desc, cq)
+
+    fun statfield(cq: ChildQuery? = null): InsnQuery = statfield(null, cq)
+
+    fun getter(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (it.opcode == GETSTATIC || it.opcode == GETFIELD) &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun getter(desc: String?, cq: ChildQuery? = null): InsnQuery = getter(null, desc, cq)
+
+    fun getter(cq: ChildQuery? = null): InsnQuery = getter(null, cq)
+
+    fun putter(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FieldInsnNode && (it.opcode == PUTSTATIC || it.opcode == PUTFIELD) &&
+                (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun putter(desc: String?, cq: ChildQuery? = null): InsnQuery = putter(null, desc, cq)
+
+    fun putter(cq: ChildQuery? = null): InsnQuery = putter(null, cq)
+
+    fun lvar(`var`: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is VarInsnNode && (`var` == null || it.`var` == `var`)
+    }, cq)
+
+    fun lvar(cq: ChildQuery? = null): InsnQuery = InsnQuery({ it is VarInsnNode }, cq)
+
+    fun jump(opcode: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is JumpInsnNode && (opcode == null || it.opcode == opcode)
+    }, cq)
+
+    fun jump(cq: ChildQuery? = null): InsnQuery = jump(null, cq)
+
+    fun frame(type: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is FrameNode && (type == null || it.type == type)
+    }, cq)
+
+    fun frame(cq: ChildQuery? = null): InsnQuery = frame(null, cq)
+
+    fun label(cq: ChildQuery? = null): InsnQuery = InsnQuery({ it is LabelNode }, cq)
+
+    fun constant(cst: Any?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is LdcInsnNode && (cst == null || it.cst == cst)
+    }, cq)
+
+    fun constant(cq: ChildQuery? = null): InsnQuery = constant(null, cq)
+
+    fun line(line: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is LineNumberNode && (line == null || it.line == line)
+    }, cq)
+
+    fun line(cq: ChildQuery? = null): InsnQuery = line(null, cq)
+
+    fun tswitch(min: Int?, max: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is TableSwitchInsnNode && (min == null || it.min == min) && (max == null || it.max == max)
+    }, cq)
+
+    fun tswitch(cq: ChildQuery? = null): InsnQuery = tswitch(null, null, cq)
+
+    fun lswitch(keys: Array<Int>?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is LookupSwitchInsnNode && (keys == null || it.keys.containsAll(keys.asList()))
+    }, cq)
+
+    fun lswitch(cq: ChildQuery? = null): InsnQuery = lswitch(null, cq)
+
+    fun mana(desc: String?, dims: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is MultiANewArrayInsnNode && (desc == null || StringMatcher.matches(desc, it.desc)) &&
+                (dims == null || it.dims == dims)
+    }, cq)
+
+    fun mana(desc: String?, cq: ChildQuery? = null): InsnQuery = mana(desc, null, cq)
+
+    fun mana(cq: ChildQuery? = null): InsnQuery = mana(null, cq)
+
+    fun type(desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is TypeInsnNode && (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun dynamic(name: String?, desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is InvokeDynamicInsnNode && (name == null || StringMatcher.matches(name, it.name)) &&
+                (desc == null || StringMatcher.matches(desc, it.desc))
+    }, cq)
+
+    fun dynamic(desc: String?, cq: ChildQuery? = null): InsnQuery = dynamic(null, desc, cq)
+
+    fun dynamic(cq: ChildQuery? = null): InsnQuery = dynamic(null, cq)
+
+    fun inc(`var`: Int?, incr: Int?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
+        it is IincInsnNode && (`var` == null || it.`var` == `var`) && (incr == null || it.incr == incr)
     }, cq)
 }
