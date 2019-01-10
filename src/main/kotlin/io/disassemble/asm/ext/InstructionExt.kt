@@ -5,6 +5,17 @@ import org.objectweb.asm.Opcodes.INVOKESTATIC
 import org.objectweb.asm.Type
 import org.objectweb.asm.tree.*
 import org.objectweb.asm.util.Printer
+import java.util.ArrayList
+import kotlin.collections.HashMap
+import kotlin.collections.List
+import kotlin.collections.MutableList
+import kotlin.collections.MutableMap
+import kotlin.collections.contains
+import kotlin.collections.emptyList
+import kotlin.collections.forEach
+import kotlin.collections.indices
+import kotlin.collections.set
+import kotlin.collections.toMutableList
 
 /**
  * @author Tyler Sedlar
@@ -12,6 +23,9 @@ import org.objectweb.asm.util.Printer
  */
 
 private val CHILD_MAP: MutableMap<Int, MutableList<AbstractInsnNode>> = HashMap()
+private val PARENT_MAP: MutableMap<Int, AbstractInsnNode> = HashMap()
+private val TREE_NEXT_NEIGHBOR_MAP: MutableMap<Int, AbstractInsnNode> = HashMap()
+private val TREE_PREVIOUS_NEIGHBOR_MAP: MutableMap<Int, AbstractInsnNode> = HashMap()
 
 /**
  * Provides a unique hash for this instruction
@@ -32,6 +46,42 @@ val AbstractInsnNode.children: MutableList<AbstractInsnNode>
             val children = ArrayList<AbstractInsnNode>()
             CHILD_MAP[hash] = children
             children
+        }
+    }
+
+/**
+ * Gets this instruction's parent, if constructed through a tree.
+ */
+val AbstractInsnNode.parent: AbstractInsnNode?
+    get() {
+        return if (hash in PARENT_MAP) {
+            PARENT_MAP[hash]
+        } else {
+            null
+        }
+    }
+
+/**
+ * Gets this instruction's next neighbor in its tree
+ */
+val AbstractInsnNode.nextInTree: AbstractInsnNode?
+    get() {
+        return if (hash in TREE_NEXT_NEIGHBOR_MAP) {
+            TREE_NEXT_NEIGHBOR_MAP[hash]
+        } else {
+            null
+        }
+    }
+
+/**
+ * Gets this instruction's previous neighbor in its tree
+ */
+val AbstractInsnNode.prevInTree: AbstractInsnNode?
+    get() {
+        return if (hash in TREE_PREVIOUS_NEIGHBOR_MAP) {
+            TREE_PREVIOUS_NEIGHBOR_MAP[hash]
+        } else {
+            null
         }
     }
 
@@ -100,6 +150,21 @@ val AbstractInsnNode.pushSize: Int
     get() = stackSizes.second
 
 /**
+ * Sets this instruction's parent instruction
+ */
+fun AbstractInsnNode.setParent(parent: AbstractInsnNode) {
+    PARENT_MAP[hash] = parent
+}
+
+/**
+ * Sets this instruction's neighbor data
+ */
+fun AbstractInsnNode.setNeighborsInTree(next: AbstractInsnNode) {
+    TREE_NEXT_NEIGHBOR_MAP[hash] = next
+    TREE_PREVIOUS_NEIGHBOR_MAP[next.hash] = this
+}
+
+/**
  * Checks if this instruction has n instructions following it
  *
  * @param amount The amount of instructions following this instruction
@@ -160,4 +225,46 @@ fun AbstractInsnNode.nextValidPattern(vararg opcodes: Int): List<AbstractInsnNod
         results.add(current)
     }
     return results
+}
+
+/**
+ * Gets the next instruction matching the given query within the max distance
+ */
+fun AbstractInsnNode.nextInTree(query: (AbstractInsnNode) -> Boolean, maxDist: Int = 50): AbstractInsnNode? {
+    var next: AbstractInsnNode? = this.nextInTree
+    var dist = 1
+    while (next != null &&  dist < maxDist) {
+        if (query(next)) {
+            return next
+        }
+        next = next.nextInTree
+        dist++
+    }
+    return null
+}
+
+/**
+ * Prints out this instructions child tree
+ */
+fun AbstractInsnNode.printTree(indent: String = "") {
+    println(indent + this.verbose)
+    this.children.forEach { it.printTree("$indent  ") }
+}
+
+/**
+ * Gets the children of this instruction's tree matching the given opcode
+ */
+fun AbstractInsnNode.findChildren(query: (AbstractInsnNode) -> Boolean, idx: Int = 0): MutableList<AbstractInsnNode> {
+    if (hash in CHILD_MAP) {
+        val treeChildren = CHILD_MAP[hash]!!
+        val children: MutableList<AbstractInsnNode> = ArrayList()
+        for (i in idx until treeChildren.size) {
+            val child = treeChildren[i]
+            if (query(child)) {
+                children.add(child)
+            }
+        }
+        return if (!children.isEmpty()) children else emptyList<AbstractInsnNode>().toMutableList()
+    }
+    return emptyList<AbstractInsnNode>().toMutableList()
 }

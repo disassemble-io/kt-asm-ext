@@ -54,10 +54,15 @@ val MethodNode.instructionTree: List<AbstractInsnNode>
         val nodes: MutableList<AbstractInsnNode> = ArrayList()
         val insns = this.instructions.toArray().reversedArray()
         val idx = AtomicInteger(0)
+        var prev: AbstractInsnNode? = null
         while (idx.get() < insns.size) {
             val insn = insns[idx.get()]
+            if (prev != null) {
+                insn.setNeighborsInTree(prev)
+            }
             visitTree(insns, insn, idx, AtomicInteger(0))
             nodes.add(insn)
+            prev = insn
         }
         return nodes.reversed()
     }
@@ -120,10 +125,17 @@ private fun visitTree(insns: Array<AbstractInsnNode>, parent: AbstractInsnNode, 
     val expected = sizes.first // the pullCount
     val childCtr = AtomicInteger(0)
 
+    var prev: AbstractInsnNode? = null
+
     while (childCtr.get() < expected) {
         val next = insns[idx.get()]
+        if (prev != null) {
+            next.setNeighborsInTree(prev)
+        }
+        next.setParent(parent)
         parent.children.add(next)
         visitTree(insns, next, idx, childCtr)
+        prev = next
     }
 
     parent.children.reverse()
