@@ -11,14 +11,24 @@ import org.objectweb.asm.tree.IntInsnNode
 import org.objectweb.asm.tree.MethodInsnNode
 
 typealias InsnFilter = (insn: AbstractInsnNode) -> Boolean
+typealias ChildQuery = () -> InsnQuery
 typealias InsnNameMap = MutableMap<String, MutableList<AbstractInsnNode>>
 
-class InsnQuery(var filter: InsnFilter) {
+class InsnQuery(var filter: InsnFilter, child: ChildQuery? = null) {
 
     val nearQueries: MutableList<InsnQuery> = ArrayList()
     val childQueries: MutableList<InsnQuery> = ArrayList()
     var name: String? = null
     var dist: Int = 10
+
+    init {
+        child?.let { childQueries.add(it()) }
+    }
+
+    /**
+     * Uses the % operator to set the name of this query
+     */
+    operator fun rem(name: String) = name(name)
 
     /**
      * Sets the name of this query
@@ -31,7 +41,12 @@ class InsnQuery(var filter: InsnFilter) {
     /**
      * Uses the + operator to add a query to the nearQueries list
      */
-    operator fun plus(query: InsnQuery): InsnQuery {
+    operator fun plus(query: InsnQuery): InsnQuery = near(query)
+
+    /**
+     * Adds a query to the nearQueries list
+     */
+    infix fun near(query: InsnQuery): InsnQuery {
         nearQueries.add(query)
         return this
     }
@@ -39,7 +54,12 @@ class InsnQuery(var filter: InsnFilter) {
     /**
      * Uses the / operator to add a query to the childQueries list
      */
-    operator fun div(query: InsnQuery): InsnQuery {
+    operator fun div(query: InsnQuery): InsnQuery = child(query)
+
+    /**
+     * Adds a query to the childQueries list
+     */
+    infix fun child(query: InsnQuery): InsnQuery {
         childQueries.add(query)
         return this
     }
@@ -47,7 +67,12 @@ class InsnQuery(var filter: InsnFilter) {
     /**
      * Sets the maximum travel distance to finding this query
      */
-    operator fun rangeTo(dist: Int): InsnQuery {
+    operator fun rangeTo(dist: Int): InsnQuery = dist(dist)
+
+    /**
+     * Sets the maximum travel distance to finding this query
+     */
+    infix fun dist(dist: Int): InsnQuery {
         this.dist = dist
         return this
     }
@@ -157,10 +182,10 @@ class InsnQuery(var filter: InsnFilter) {
 
 object Queries {
 
-    val any: InsnQuery = InsnQuery { true }
-    val num: InsnQuery = InsnQuery { it is IntInsnNode }
-    val method: InsnQuery = InsnQuery { it is MethodInsnNode }
-    val field: InsnQuery = InsnQuery { it is FieldInsnNode }
+    val any: InsnQuery = InsnQuery({ true })
+    val num: InsnQuery = InsnQuery({ it is IntInsnNode })
+    val method: InsnQuery = InsnQuery({ it is MethodInsnNode })
+    val field: InsnQuery = InsnQuery({ it is FieldInsnNode })
 
     val nop: InsnQuery = op(NOP)
     val aconst_null: InsnQuery = op(ACONST_NULL)
@@ -320,19 +345,19 @@ object Queries {
     val ifnull: InsnQuery = op(IFNULL)
     val ifnonnull: InsnQuery = op(IFNONNULL)
 
-    fun op(opcode: Int): InsnQuery = InsnQuery {
+    fun op(opcode: Int, cq: ChildQuery? = null): InsnQuery = InsnQuery({
         it.opcode == opcode
-    }
+    }, cq)
 
-    fun num(operand: Int): InsnQuery = InsnQuery {
+    fun num(operand: Int, cq: ChildQuery? = null): InsnQuery = InsnQuery({
         it is IntInsnNode && it.operand == operand
-    }
+    }, cq)
 
-    fun method(desc: String?): InsnQuery = InsnQuery {
+    fun method(desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
         it is MethodInsnNode && (desc == null || StringMatcher.matches(desc, it.desc))
-    }
+    }, cq)
 
-    fun field(desc: String?): InsnQuery = InsnQuery {
+    fun field(desc: String?, cq: ChildQuery? = null): InsnQuery = InsnQuery({
         it is FieldInsnNode && (desc == null || StringMatcher.matches(desc, it.desc))
-    }
+    }, cq)
 }

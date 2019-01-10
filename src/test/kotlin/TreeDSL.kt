@@ -11,10 +11,9 @@ fun main(args: Array<String>) {
     val classes = ClassScanner.scanJar(File(jar))
 
     classes["client"]?.methodList?.find { it.name == "init" }?.instructionTree?.query(
-            method("^>(III")
-                    / num(765)
-                    / num(503)
-                    / (sipush name "revision")
+            method("^>(III") {
+                num(765) + num(503) + (sipush % "revision")
+            }
     )?.forEach { entry ->
         println(entry.key + ":")
         entry.value.forEach {
