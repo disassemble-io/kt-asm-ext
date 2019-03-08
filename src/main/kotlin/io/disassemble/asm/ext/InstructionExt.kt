@@ -97,6 +97,7 @@ val AbstractInsnNode.verbose: String
             this is IntInsnNode -> verbose += " ${this.operand}"
             this is MethodInsnNode -> verbose += " ${this.owner}.${this.name}${this.desc}"
             this is VarInsnNode -> verbose += " ${this.`var`}"
+            this is FieldInsnNode -> verbose += " ${this.owner}.${this.name} (${this.desc})"
         }
         return verbose
     }
